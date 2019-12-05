@@ -1,21 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-
 package org.apache.catalina.connector.http;
 
 
@@ -60,6 +42,9 @@ import org.apache.catalina.util.StringParser;
  * @deprecated
  */
 
+/**
+ * 用于处理请求的处理器
+ */
 final class HttpProcessor
     implements Lifecycle, Runnable {
 
@@ -124,6 +109,7 @@ final class HttpProcessor
     /**
      * The identifier of this processor, unique per connector.
      */
+    //processor的id，在每个connector下是唯一的
     private int id = 0;
 
 
@@ -143,6 +129,7 @@ final class HttpProcessor
     /**
      * The string parser we will use for parsing request lines.
      */
+    //用来解析请求行的
     private StringParser parser = new StringParser();
 
 
@@ -238,6 +225,7 @@ final class HttpProcessor
      * has successfully parsed the request headers, and before starting
      * reading the request entity body.
      */
+    //在解析完请求头后，并在解析请求实体前，会发送响应码100(Continue)给客户端作为回应
     private boolean sendAck = false;
 
 
@@ -492,6 +480,7 @@ final class HttpProcessor
      * @exception IOException if an input/output error occurs
      * @exception ServletException if a parsing error occurs
      */
+    //记录端口和IP地址
     private void parseConnection(Socket socket)
         throws IOException, ServletException {
 
@@ -517,6 +506,7 @@ final class HttpProcessor
      * @exception IOException if an input/output error occurs
      * @exception ServletException if a parsing error occurs
      */
+    //解析请求头
     private void parseHeaders(SocketInputStream input)
         throws IOException, ServletException {
 
@@ -542,15 +532,22 @@ final class HttpProcessor
 
             // Set the corresponding request headers
             if (header.equals(DefaultHeaders.AUTHORIZATION_NAME)) {
+                //请求头authorization
                 request.setAuthorization(value);
             } else if (header.equals(DefaultHeaders.ACCEPT_LANGUAGE_NAME)) {
+                //请求头accept-language
                 parseAcceptLanguage(value);
             } else if (header.equals(DefaultHeaders.COOKIE_NAME)) {
+                //请求头cookie
+                //解析cookie
                 Cookie cookies[] = RequestUtil.parseCookieHeader(value);
                 for (int i = 0; i < cookies.length; i++) {
+                    //如果cookie的name是JSESSIONID的话
                     if (cookies[i].getName().equals
                         (Globals.SESSION_COOKIE_NAME)) {
                         // Override anything requested in the URL
+                        //判断sessionId是否从cookie中获取，默认是false
+                        //如果cookie中有多个session id，只会取第一个
                         if (!request.isRequestedSessionIdFromCookie()) {
                             // Accept only the first session id cookie
                             request.setRequestedSessionId
@@ -569,6 +566,7 @@ final class HttpProcessor
                     request.addCookie(cookies[i]);
                 }
             } else if (header.equals(DefaultHeaders.CONTENT_LENGTH_NAME)) {
+                //请求头contentLength
                 int n = -1;
                 try {
                     n = Integer.parseInt(value);
@@ -579,9 +577,12 @@ final class HttpProcessor
                 }
                 request.setContentLength(n);
             } else if (header.equals(DefaultHeaders.CONTENT_TYPE_NAME)) {
+                //请求头cookieContentType
                 request.setContentType(value);
             } else if (header.equals(DefaultHeaders.HOST_NAME)) {
+                //请求头hostName
                 int n = value.indexOf(':');
+                //当前url中不含端口号时，根据协议使用默认端口号
                 if (n < 0) {
                     if (connector.getScheme().equals("http")) {
                         request.setServerPort(80);
@@ -593,6 +594,7 @@ final class HttpProcessor
                     else
                         request.setServerName(value);
                 } else {
+                    //当前url中含有端口号时
                     if (proxyName != null)
                         request.setServerName(proxyName);
                     else
@@ -600,8 +602,10 @@ final class HttpProcessor
                     if (proxyPort != 0)
                         request.setServerPort(proxyPort);
                     else {
+                        //默认端口号是80
                         int port = 80;
                         try {
+                            //设置端口号
                             port =
                                 Integer.parseInt(value.substring(n+1).trim());
                         } catch (Exception e) {
@@ -613,8 +617,10 @@ final class HttpProcessor
                     }
                 }
             } else if (header.equals(DefaultHeaders.CONNECTION_NAME)) {
+                //请求头connection
                 if (header.valueEquals
                     (DefaultHeaders.CONNECTION_CLOSE_VALUE)) {
+                    //短连接
                     keepAlive = false;
                     response.setHeader("Connection", "close");
                 }
@@ -625,6 +631,7 @@ final class HttpProcessor
                   }
                 */
             } else if (header.equals(DefaultHeaders.EXPECT_NAME)) {
+                //请求头expect
                 if (header.valueEquals(DefaultHeaders.EXPECT_100_VALUE))
                     sendAck = true;
                 else
@@ -635,6 +642,8 @@ final class HttpProcessor
                 //request.setTransferEncoding(header);
             }
 
+            //指向可用header的position+1
+            //与allocateHeader配合使用，见HttpRequestImpl
             request.nextHeader();
 
         }
@@ -656,15 +665,18 @@ final class HttpProcessor
         throws IOException, ServletException {
 
         // Parse the incoming request line
+        //解析请求行
         input.readRequestLine(requestLine);
         
         // When the previous method returns, we're actually processing a 
         // request
         status = Constants.PROCESSOR_ACTIVE;
-        
+
+        //方法
         String method =
             new String(requestLine.method, 0, requestLine.methodEnd);
         String uri = null;
+        //协议
         String protocol = new String(requestLine.protocol, 0,
                                      requestLine.protocolEnd);
 
@@ -684,6 +696,7 @@ final class HttpProcessor
             sendAck = false;
             // For HTTP/1.0, connection are not persistent by default,
             // unless specified with a Connection: Keep-Alive header.
+            //http1.0默认短连接，想要长连接的话需要添加Keep-Alive的请求头
             keepAlive = false;
         }
 
@@ -699,6 +712,7 @@ final class HttpProcessor
         // Parse any query parameters out of the request URI
         int question = requestLine.indexOf("?");
         if (question >= 0) {
+            //url里面的请求参数
             request.setQueryString
                 (new String(requestLine.uri, question + 1,
                             requestLine.uriEnd - question - 1));
@@ -721,12 +735,15 @@ final class HttpProcessor
                 if (pos == -1) {
                     uri = "";
                 } else {
+                    //去掉最前面的"://"
                     uri = uri.substring(pos);
                 }
             }
         }
 
         // Parse any requested session ID out of the request URI
+        //当sessionId来自url中时
+        //查找sessionId的下标位置：jsessionid
         int semicolon = uri.indexOf(match);
         if (semicolon >= 0) {
             String rest = uri.substring(semicolon + match.length());
@@ -750,11 +767,13 @@ final class HttpProcessor
         }
 
         // Normalize URI (using String operations at the moment)
+        //将路径转换为特定格式
         String normalizedUri = normalize(uri);
         if (debug >= 1)
             log("Normalized: '" + uri + "' to '" + normalizedUri + "'");
 
         // Set the corresponding request properties
+        //往request里填充请求信息
         ((HttpRequest) request).setMethod(method);
         request.setProtocol(protocol);
         if (normalizedUri != null) {
@@ -924,12 +943,16 @@ final class HttpProcessor
                     if (!request.getRequest().getProtocol()
                         .startsWith("HTTP/0"))
                         parseHeaders(input);
+                    //如果是http1.1协议
                     if (http11) {
                         // Sending a request acknowledge back to the client if
                         // requested.
+                        //返回HTTP/1.1 100 Continue
                         ackRequest(output);
                         // If the protocol is HTTP/1.1, chunking is allowed.
+                        //如果connector允许分块传输
                         if (connector.isChunkingAllowed())
+                            //允许分块传输
                             response.setAllowChunking(true);
                     }
                 }
@@ -973,6 +996,7 @@ final class HttpProcessor
                 ((HttpServletResponse) response).setHeader
                     ("Date", FastHttpDateFormat.getCurrentDate());
                 if (ok) {
+                    //重要逻辑，将request和response对象交给container来处理
                     connector.getContainer().invoke(request, response);
                 }
             } catch (ServletException e) {
@@ -1034,6 +1058,7 @@ final class HttpProcessor
             status = Constants.PROCESSOR_IDLE;
 
             // Recycling the request and the response objects
+            //重新回收request和response对象
             request.recycle();
             response.recycle();
 
@@ -1084,12 +1109,14 @@ final class HttpProcessor
 
             // Process the request from this socket
             try {
+                //具体处理逻辑
                 process(socket);
             } catch (Throwable t) {
                 log("process.invoke", t);
             }
 
             // Finish up this request
+            //回收自己(processor)
             connector.recycle(this);
 
         }
@@ -1109,6 +1136,7 @@ final class HttpProcessor
 
         log(sm.getString("httpProcessor.starting"));
 
+        //启动守护线程
         thread = new Thread(this, threadName);
         thread.setDaemon(true);
         thread.start();

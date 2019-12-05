@@ -1,21 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-
 package org.apache.catalina.connector.http;
 
 
@@ -49,6 +31,7 @@ import org.apache.catalina.util.StringManager;
 
 /**
  * Implementation of an HTTP/1.1 connector.
+ * 实现HTTP/1.1协议的连接器
  *
  * @author Craig R. McClanahan
  * @author Remy Maucherat
@@ -92,18 +75,21 @@ public final class HttpConnector
     /**
      * The Container used for processing requests received by this Connector.
      */
+    //用来处理请求的container
     protected Container container = null;
 
 
     /**
      * The set of processors that have ever been created.
      */
+    //用来保存创建的processors
     private Vector created = new Vector();
 
 
     /**
      * The current number of processors that have been created.
      */
+    //当前的processors的数量
     private int curProcessors = 0;
 
 
@@ -141,12 +127,14 @@ public final class HttpConnector
     /**
      * The minimum number of processors to start at initialization time.
      */
+    //最小processors数
     protected int minProcessors = 5;
 
 
     /**
      * The maximum number of processors allowed, or <0 for unlimited.
      */
+    //最大processors数
     private int maxProcessors = 20;
 
 
@@ -160,6 +148,7 @@ public final class HttpConnector
     /**
      * The port number on which we listen for HTTP requests.
      */
+    //监听的端口号
     private int port = 8080;
 
 
@@ -167,6 +156,7 @@ public final class HttpConnector
      * The set of processors that have been created but are not currently
      * being used to process a request.
      */
+    //保存当前未被使用的processors（即当前处于空闲的processors）
     private Stack processors = new Stack();
 
 
@@ -211,6 +201,7 @@ public final class HttpConnector
     /**
      * The server socket through which we listen for incoming TCP connections.
      */
+    //ServerSocket，用来监听请求的
     private ServerSocket serverSocket = null;
 
 
@@ -509,6 +500,7 @@ public final class HttpConnector
 
         if (this.factory == null) {
             synchronized (this) {
+                //不是常见的双重检查，感觉还是存在并发的问题
                 this.factory = new DefaultServerSocketFactory();
             }
         }
@@ -785,6 +777,7 @@ public final class HttpConnector
      *
      * @param processor The processor to be recycled
      */
+    //回收processor，重新放回到 保存当前未被使用的processors 的栈里面
     void recycle(HttpProcessor processor) {
 
         //        if (debug >= 2)
@@ -804,18 +797,21 @@ public final class HttpConnector
      * <code>null</code> instead.
      */
     private HttpProcessor createProcessor() {
-
+        //加锁
         synchronized (processors) {
+            //如果当前有空闲的processor，则从栈中获取
             if (processors.size() > 0) {
                 // if (debug >= 2)
                 // log("createProcessor: Reusing existing processor");
                 return ((HttpProcessor) processors.pop());
             }
+            //此时没有空闲的processor，如果当前的processor数量没达到最大限制数量，则创建新的processor
             if ((maxProcessors > 0) && (curProcessors < maxProcessors)) {
                 // if (debug >= 2)
                 // log("createProcessor: Creating new processor");
                 return (newProcessor());
             } else {
+                //maxProcessors被设置为<0的数，则可无限制创建新的processor
                 if (maxProcessors < 0) {
                     // if (debug >= 2)
                     // log("createProcessor: Creating new processor");
@@ -823,6 +819,7 @@ public final class HttpConnector
                 } else {
                     // if (debug >= 2)
                     // log("createProcessor: Cannot create new processor");
+                    //此时无法获取到可用的processor，也无法创建新的，只能返回null
                     return (null);
                 }
             }
@@ -876,11 +873,14 @@ public final class HttpConnector
      * Create and return a new processor suitable for processing HTTP
      * requests and returning the corresponding responses.
      */
+    //创建processor
     private HttpProcessor newProcessor() {
 
         //        if (debug >= 2)
         //            log("newProcessor: Creating new processor");
+        //创建processor，并且当前processor数量+1
         HttpProcessor processor = new HttpProcessor(this, curProcessors++);
+        //如果实现了生命周期的接口
         if (processor instanceof Lifecycle) {
             try {
                 ((Lifecycle) processor).start();
@@ -889,6 +889,7 @@ public final class HttpConnector
                 return (null);
             }
         }
+        //添加到 用来保存创建的processors 的vector中
         created.addElement(processor);
         return (processor);
 
@@ -969,6 +970,7 @@ public final class HttpConnector
             try {
                 //                if (debug >= 3)
                 //                    log("run: Waiting on serverSocket.accept()");
+                //阻塞，直到收到请求
                 socket = serverSocket.accept();
                 //                if (debug >= 3)
                 //                    log("run: Returned from serverSocket.accept()");
@@ -1021,6 +1023,7 @@ public final class HttpConnector
             }
 
             // Hand this socket off to an appropriate processor
+            //获得一个当前可用的processor
             HttpProcessor processor = createProcessor();
             if (processor == null) {
                 try {
@@ -1033,6 +1036,7 @@ public final class HttpConnector
             }
             //            if (debug >= 3)
             //                log("run: Assigning socket to processor " + processor);
+            //把socket交给processor来处理，当处理完后，processor会自己回收自己
             processor.assign(socket);
 
             // The processor will recycle itself when it finishes
@@ -1057,6 +1061,7 @@ public final class HttpConnector
         log(sm.getString("httpConnector.starting"));
 
         thread = new Thread(this, threadName);
+        //守护线程
         thread.setDaemon(true);
         thread.start();
 
@@ -1122,6 +1127,7 @@ public final class HttpConnector
     /**
      * Initialize this connector (create ServerSocket here!)
      */
+    //初始化connector，其中包括了创建ServerSocket的过程
     public void initialize()
     throws LifecycleException {
         if (initialized)
@@ -1133,6 +1139,7 @@ public final class HttpConnector
 
         // Establish a server socket on the specified port
         try {
+            //建立servletSocket
             serverSocket = open();
         } catch (IOException ioe) {
             log("httpConnector, io problem: ", ioe);
@@ -1172,17 +1179,21 @@ public final class HttpConnector
             throw new LifecycleException
                 (sm.getString("httpConnector.alreadyStarted"));
         threadName = "HttpConnector[" + port + "]";
+        //发送生命周期的事件
         lifecycle.fireLifecycleEvent(START_EVENT, null);
         started = true;
 
         // Start our background thread
+        //启动守护线程
         threadStart();
 
         // Create the specified minimum number of processors
+        //初始化创建processor，使得当前数量达到最小processor数
         while (curProcessors < minProcessors) {
             if ((maxProcessors > 0) && (curProcessors >= maxProcessors))
                 break;
             HttpProcessor processor = newProcessor();
+            //把processor放回 用于保存当前可用的processor的栈里面
             recycle(processor);
         }
 
@@ -1200,10 +1211,12 @@ public final class HttpConnector
         if (!started)
             throw new LifecycleException
                 (sm.getString("httpConnector.notStarted"));
+        //发送生命周期的事件
         lifecycle.fireLifecycleEvent(STOP_EVENT, null);
         started = false;
 
         // Gracefully shut down all processors we have created
+        //关闭所有的processors
         for (int i = created.size() - 1; i >= 0; i--) {
             HttpProcessor processor = (HttpProcessor) created.elementAt(i);
             if (processor instanceof Lifecycle) {
@@ -1215,6 +1228,7 @@ public final class HttpConnector
             }
         }
 
+        //关闭serverSocket
         synchronized (threadSync) {
             // Close the server socket we were using
             if (serverSocket != null) {
@@ -1225,6 +1239,7 @@ public final class HttpConnector
                 }
             }
             // Stop our background thread
+            //关闭后台的守护线程
             threadStop();
         }
         serverSocket = null;
